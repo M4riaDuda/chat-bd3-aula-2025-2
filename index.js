@@ -44,7 +44,11 @@ io.on('connection', socket => {
 
         socket.broadcast.emit('receiveMessage', data);
 
+        console.log('QTD MENSAGENS: ' + messages.length);
+
     });
+
+    console.log('QTD MENSAGENS: ' + messages.length);
 
 });
 
