@@ -1,58 +1,78 @@
-const express = require('express');
-const http = require('http');
-const socketIO = require('socket.io');
+const express = require("express");
+const http = require("http");
 
 const app = express();
 
-const server = http.createServer(app);
+const server = http.createServer(app);  
 
-const io = socketIO(server);
-
-const ejs = require('ejs');
+const ejs = require("ejs");
 const path = require('path');
+const socetIO = require('socket.io');
+const { Socket } = require("dgram");
 
-app.use(express.static(path.join(__dirname, 'public')));
-// console.log(path.join(__dirname, 'public'));
+const io = socetIO(server)
+
+const mongoose = require('mongoose')
+
+app.use(express.static(path.join(__dirname,'public')));
 
 app.set('view', path.join(__dirname, 'public'));
 
 app.engine('html', ejs.renderFile);
 
-app.use('/', (req, res) => {
-    res.render('index.html')
-});
+app.use('/', (req,res)=>{
+    res.render('indes.html')
+})
 
-// Lógica do Socket.io - Envio e propagação de mensagens
+function connectDB(){
+    let dbURL = 'mongodb+srv://maria:hBKIoVTdSME0WIVx@cluster0.qcjj0.mongodb.net/'
+    mongoose.connect(dbURL)
+    mongoose.connection.on('error', console.error.bind(console, 'Connection error:'))
+    mongoose.connection.once('open', function(){
+        console.log('ATLAS MONGODB CONECTADO COM SUCESSO!')
+    })
+}
 
-// Array que simula o banco de dados
+connectDB()
+
+let Message = mongoose.model('Message', {usuario:String, data_hora:String, message:String})
+
+// LÓGICA DO SOCKET.IO - ENVIO DE PROPAGAÇÃO DE MENSAGENS
+
+//array que simula o banco de dados:
 let messages = [];
 
-// Estrutura de conexão do Socket.io
-io.on('connection', socket => {
+Message.find({}).then(docs=>{
+    messages = docs
+    }).catch(error=>{
+    console.log(error)
+});
 
-    // Teste de conexão
-    console.log('NOVO USUÁRIO CONECTADO: ' + socket.id);
+//ESTRUTURA DE CONEXÃO DO SOCKET.IO
+io.on('connection', socket=>{
 
-    // Recupera e mantém (exibe) as mensagens entre front e o back
+    //teste de conexão
+    console.log('NOVO USUÁRIO CONECTADO: ' + socket.id)
+
+    //Recupera e mantém (exibe) as mensagens entre o front e o back:
     socket.emit('previousMessage', messages);
 
-    // Lógica de chat quando uma mensagem é enviada
-    socket.on('sendMessage', data => {
+    //Lógica de chat quando uma mensagem é enviada:
+    socket.on('sendMessage', data=>{
+        //adiciona a mensagem no ginal do array de menssagens:
+        // messages.push(data);
+        let message = new Message(data)
 
-        // Adiciona a mensagem no final do array de mensagens
-        messages.push(data);
+        message.save().then(
+            socket.broadcast.emit('receivedMessage', data)
+        ).catch(error=>{
+            console.log(error)
+        });
 
-        socket.broadcast.emit('receiveMessage', data);
-
-        console.log('QTD MENSAGENS: ' + messages.length);
-
+        console.log('QTD MENSAGENS: '+messages.length)
     });
 
-    console.log('QTD MENSAGENS: ' + messages.length);
+    console.log('QTD MENSAGENS: '+messages.length)
+})
 
-});
-
-
-server.listen(3000, () => {
-    console.log('CHAT RODANDO EM - HTTP://localhost:3000')
-});
+server.listen(3000, ()=>{console.log("chat rodando em http://localhost:3000")});
